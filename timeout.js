@@ -7,7 +7,10 @@ function inc(){
   }
   return __cnt;
 }
-var __now = (new Date()).getTime();
+function now(){
+  return (new Date()).getTime();
+}
+var __now = now();
 function callIn(cb,timeout){
   var cnt = inc();
   cbs.push([__now+timeout,cb,Array.prototype.slice.call(arguments,2),cnt]);
@@ -17,37 +20,53 @@ var clears = {};
 function clear(cnt){
   clears[cnt] = 1;
 };
-var __processing = false;
-var __samplecount = 30
-var __idle = new Array(__samplecount);
-var __busy = new Array(__samplecount);
-for(var i = 0; i<__samplecount; i++){
-  __idle[i] = 0;
-  __busy[i] = 0;
-}
-var __timecursor = 0;
-function recordtimes(i,b){
-  __idle[__timecursor]=i;
-  __busy[__timecursor]=b;
-  __timecursor++;
-  if(__timecursor>=__samplecount){
-    __timecursor=0;
+function WindowedAverage(length){
+  if(!length){return;}
+  this.samples = new Array(length);
+  for(var i=0; i<length; i++){
+    this.samples[i] = 0;
   }
+  this.cursor = 0;
 }
+WindowedAverage.prototype.add = function(sample){
+  this.samples[this.cursor] = sample;
+  this.cursor++;
+  if(this.cursor>=this.samples.length){
+    this.cursor=0;
+  }
+};
+WindowedAverage.prototype.sum = function(){
+  var ret = 0;
+  for(var i = 0; i<this.samples.length; i++){
+    ret+=this.samples[i];
+  }
+  return ret;
+};
+WindowedAverage.prototype.avg = function(){
+  return this.sum()/this.samples.length;
+}
+
+
+var __processing = false;
+var __delay = new WindowedAverage(100);
+var __timecursor = 0;
+var __metricsstart = now();
+var __exectime = 0;
+var __interval = 100;
+var __intervalhandle = setInterval(fire,__interval);
 function fire(){
-  var __n = __now;
-  __now = (new Date()).getTime();
-  var __i = __now-__n;
-  __n = __now;
+  __now = now();
   if(__processing){
     return;
   }
+  var _start = now();
   __processing = true;
   var cursor = 0;
   //console.log('start',cbs.length);
   while(cursor<cbs.length){
     var cb = cbs[cursor];
     if(cb[0]<__now){
+      __delay.add(__now-cb[0]);
       if(clears[cb[3]]){
         delete clears[cb[3]];
       }else{
@@ -59,21 +78,32 @@ function fire(){
     }
   }
   //console.log('finally',cbs.length);
-  recordtimes(__i,(new Date()).getTime()-__n);
   __processing = false;
+  __exectime += (now()-_start);
 }
-setInterval(fire,100);
-function utilization(){
-  var _i = 0, _b = 0;
-  for(var i = 0; i<__samplecount; i++){
-    _i += __idle[i];
-    _b += __busy[i];
+function metrics(){
+  var ms = __metricsstart, et = __exectime, _d = __delay.avg()/__interval, _i = __interval, _newinterval = _i;
+  __metricsstart = now();
+  __exectime = 0;
+  if(_d<2){
+    _newinterval = ~~(__interval*.8);
   }
-  return (~~(100*_b/_i));
+  if(_d>2){
+    _newinterval = ~~(__interval/.8);
+  }
+  if(_newinterval>200){
+    _newinterval=200;
+  }
+  if(_newinterval!=_i){
+    __interval = _newinterval;
+    clearInterval(__intervalhandle);
+    __intervalhandle = setInterval(fire,__interval);
+  }
+  return {utilization:~~(100*et/(__metricsstart-ms)),delay:_d,interval:_i};
 }
 
 module.exports = {
   set:callIn,
   clear:clear,
-  utilization:utilization
+  metrics:metrics
 };
