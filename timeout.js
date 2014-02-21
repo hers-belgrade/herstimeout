@@ -8,7 +8,8 @@ function inc(){
   return __cnt;
 }
 function now(){
-  return (new Date()).getTime();
+  var hrt = process.hrtime();
+  return hrt[0]*1000 + hrt[1]/1000000;
 }
 var __now = now();
 function callIn(cb,timeout){
@@ -20,43 +21,33 @@ var clears = {};
 function clear(cnt){
   clears[cnt] = 1;
 };
-function WindowedAverage(length){
-  if(!length){return;}
-  this.samples = new Array(length);
-  for(var i=0; i<length; i++){
-    this.samples[i] = 0;
-  }
-  this.cursor = 0;
-}
-WindowedAverage.prototype.add = function(sample){
-  this.samples[this.cursor] = sample;
-  this.cursor++;
-  if(this.cursor>=this.samples.length){
-    this.cursor=0;
-  }
-};
-WindowedAverage.prototype.sum = function(){
-  var ret = 0;
-  for(var i = 0; i<this.samples.length; i++){
-    ret+=this.samples[i];
-  }
-  return ret;
-};
-WindowedAverage.prototype.avg = function(){
-  return this.sum()/this.samples.length;
-}
 
+function Sum(){
+}
+Sum.prototype.reset = function(){
+  this.samples = 0;
+  this.sum = 0;
+};
+Sum.prototype.add = function(element){
+  this.sum+=element;
+  this.samples++;
+};
+Sum.prototype.avg = function(){
+  return this.sum/this.samples;
+};
 
 var __processing = false;
-var __delay = new WindowedAverage(100);
+var __delay = new Sum();
 var __timecursor = 0;
 var __metricsstart = now();
 var __exectime = 0;
-var __interval = 100;
-var __intervalhandle = setInterval(fire,__interval);
+
+__delay.reset();
+
 function fire(){
   __now = now();
   if(__processing){
+    process.nextTick(fire);
     return;
   }
   var _start = now();
@@ -65,8 +56,14 @@ function fire(){
   //console.log('start',cbs.length);
   while(cursor<cbs.length){
     var cb = cbs[cursor];
-    if(cb[0]<__now){
-      __delay.add(__now-cb[0]);
+    var d = __now-cb[0];
+    if(d>0){
+      /*
+      if(d>1000){
+        console.log('!#%#',d);
+      }
+      */
+      __delay.add(d);
       if(clears[cb[3]]){
         delete clears[cb[3]];
       }else{
@@ -80,29 +77,19 @@ function fire(){
   //console.log('finally',cbs.length);
   __processing = false;
   __exectime += (now()-_start);
+  process.nextTick(fire);
 }
+process.nextTick(fire);
 function metrics(){
-  var ms = __metricsstart, et = __exectime, _d = __delay.avg()/__interval, _i = __interval, _newinterval = _i;
+  var ms = __metricsstart, et = __exectime, _d = __delay.avg();
   __metricsstart = now();
   __exectime = 0;
-  if(_d<2){
-    _newinterval = ~~(__interval*.8);
-  }
-  if(_d>2){
-    _newinterval = ~~(__interval/.8);
-  }
-  if(_newinterval>200){
-    _newinterval=200;
-  }
-  if(_newinterval!=_i){
-    __interval = _newinterval;
-    clearInterval(__intervalhandle);
-    __intervalhandle = setInterval(fire,__interval);
-  }
-  return {utilization:~~(100*et/(__metricsstart-ms)),delay:_d,interval:_i};
+  __delay.reset();
+  return {utilization:~~(100*et/(__metricsstart-ms)),delay:_d,queue:cbs.length};
 }
 
 module.exports = {
+  now:now,
   set:callIn,
   clear:clear,
   metrics:metrics
