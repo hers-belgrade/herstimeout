@@ -61,12 +61,25 @@ var __qout = 0;
 var __dolog = false;
 var __longestexec = 0;
 var __longestexecfn = '';
+var __lastMetrics = 0;
+var __metrics = {};
 
-__delay.reset();
+function resetMetrics(){
+  var ms = __metricsstart, et = __exectime, _d = __delay.avg(), qi = __qin, qo = __qout, le = __longestexec, lef = __longestexecfn;
+  __metricsstart = now();
+  __metrics = {nexttriggerin:__firsttrigger-__metricsstart,utilization:~~(100*et/(__metricsstart-ms)),delay:_d,queue:{in:qi,out:qo,current:cbs.length},longest:{time:le,fn:lef}};
+  __exectime = 0;
+  __qin = 0;
+  __qout = 0;
+  __delay.reset();
+  __longestexec = 0;
+  __longestexecfn = '';
+  __lastMetrics = __now;
+}
 
 function execute(fn,paramarry){
   var _s = now();
-  fn.apply(null,paramarry);
+  fn.apply({now:_s},paramarry);
   var _elaps = now()-_s;
   if(_elaps>__longestexec){
     __longestexec = _elaps;
@@ -95,7 +108,8 @@ function fire(){
   var cursor = 0;
   __firsttrigger = Infinity;
   //console.log('start',cbs.length);
-  while(cursor<cbs.length){
+  var cbl = cbs.length; //snapshot of cbs at start, we may never end otherwise
+  while(cursor<cbl){
     var cb = cbs[cursor];
     var trigger = cb[0];
     var d = __now-trigger;
@@ -112,6 +126,7 @@ function fire(){
         execute(cb[1],cb[2]);
       }
       cbs.splice(cursor,1);
+      cbl--;
       __qout++;
     }else{
       if(trigger<__firsttrigger){
@@ -126,20 +141,16 @@ function fire(){
   //console.log(cbs.length,cursor);
   //console.log('finally',cbs.length);
   __processing = false;
-  __exectime += (now()-_start);
+  var n = now();
+  __exectime += (n-_start);
+  if(n>__lastMetrics+10000){
+    resetMetrics();
+  }
   process.nextTick(fire);
 }
 process.nextTick(fire);
 function metrics(){
-  var ms = __metricsstart, et = __exectime, _d = __delay.avg(), qi = __qin, qo = __qout, le = __longestexec, lef = __longestexecfn;
-  __metricsstart = now();
-  __exectime = 0;
-  __qin = 0;
-  __qout = 0;
-  __delay.reset();
-  __longestexec = 0;
-  __longestexecfn = '';
-  return {nexttriggerin:__firsttrigger-__metricsstart,utilization:~~(100*et/(__metricsstart-ms)),delay:_d,queue:{in:qi,out:qo,current:cbs.length},longest:{time:le,fn:lef}};
+  return __metrics;
 }
 
 module.exports = {
