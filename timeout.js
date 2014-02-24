@@ -105,39 +105,38 @@ function fire(){
     process.nextTick(fire);
     return;
   }
-  var cursor = 0;
   __firsttrigger = Infinity;
   //console.log('start',cbs.length);
   var cbl = cbs.length; //snapshot of cbs at start, we may never end otherwise
-  while(cursor<cbl){
-    var cb = cbs[cursor];
-    var trigger = cb[0];
-    var d = __now-trigger;
-    if(d>=0){
-      /*
-      if(d>1000){
-        console.log('!#%#',d);
+  while(true){
+    var delay = 0;
+    var cursor = -1;
+    for(var i=0; i<cbl; i++){
+      var _d = __now-cbs[i][0];
+      if(_d>delay){
+        delay=_d;
+        cursor = i;
       }
-      */
-      __delay.add(d);
-      if(clears[cb[3]]){
-        delete clears[cb[3]];
-      }else{
-        execute(cb[1],cb[2]);
-      }
-      cbs.splice(cursor,1);
-      cbl--;
-      __qout++;
-    }else{
-      if(trigger<__firsttrigger){
-        __firsttrigger = trigger;
-      }
-      cursor++;
     }
+    if(!delay){
+      break;
+    }
+    __delay.add(delay);
+    var cb = cbs[cursor];
+    if(clears[cb[3]]){
+      delete clears[cb[3]];
+    }else{
+      execute(cb[1],cb[2]);
+    }
+    cbs.splice(cursor,1);
+    cbl--;
+    __qout++;
   }
+  /*
   if(__firsttrigger<__now){
     console.log(__firsttrigger-__now,'?!');
   }
+  */
   //console.log(cbs.length,cursor);
   //console.log('finally',cbs.length);
   __processing = false;
