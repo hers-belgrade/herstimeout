@@ -99,23 +99,30 @@ function fire(){
     var i = immediates.shift();
     execute(i[0],i[1]);
   }
-  __processing = false;
   if(__now<__firsttrigger){
     __exectime += (now()-_start);
+    __processing = false;
     process.nextTick(fire);
     return;
   }
-  __firsttrigger = Infinity;
   //console.log('start',cbs.length);
   var cbl = cbs.length; //snapshot of cbs at start, we may never end otherwise
   while(true){
     var delay = 0;
     var cursor = -1;
     for(var i=0; i<cbl; i++){
-      var _d = __now-cbs[i][0];
+      var _t = cbs[i][0];
+      var _d = __now-_t;
+      if(_t===__firsttrigger){
+        __firsttrigger = Infinity;
+      }
       if(_d>delay){
         delay=_d;
         cursor = i;
+      }else if(!isFinite(__firsttrigger)){
+        __firsttrigger = _t;
+      }else if(_t<__firsttrigger){
+        __firsttrigger = _t;
       }
     }
     if(!delay){
@@ -132,17 +139,15 @@ function fire(){
     cbl--;
     __qout++;
   }
-  /*
   if(__firsttrigger<__now){
     console.log(__firsttrigger-__now,'?!');
   }
-  */
   //console.log(cbs.length,cursor);
   //console.log('finally',cbs.length);
   __processing = false;
-  var n = now();
-  __exectime += (n-_start);
-  if(n>__lastMetrics+10000){
+  __now = now();
+  __exectime += (__now-_start);
+  if(__now>__lastMetrics+10000){
     resetMetrics();
   }
   process.nextTick(fire);
