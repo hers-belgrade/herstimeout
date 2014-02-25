@@ -1,3 +1,4 @@
+var os = require('os');
 var cbs = [];
 var immediates = [];
 var __cnt = 0;
@@ -94,6 +95,11 @@ function fire(){
     return;
   }
   var _start = now();
+  if(global.gc){
+    if(os.freemem()/1024/1024<300){
+      global.gc();
+    }
+  }
   __processing = true;
   while(immediates.length){
     var i = immediates.shift();
