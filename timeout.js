@@ -2,6 +2,14 @@ var os = require('os');
 var cbs = [];
 var immediates = [];
 var __cnt = 0;
+
+
+var postpone = process.version.match(/^v\d+\.(\d+)/)[1]>=10 ? function(cb){
+  setImmediate(cb);
+}:function(cb){
+  process.nextTick(cb);
+}
+
 function inc(){
   __cnt ++;
   if(__cnt>1000000000){
@@ -91,7 +99,7 @@ function execute(fn,paramarry){
 function fire(){
   __now = now();
   if(__processing){
-    process.nextTick(fire);
+    postpone(fire);
     return;
   }
   var _start = now();
@@ -108,7 +116,7 @@ function fire(){
   if(__now<__firsttrigger){
     __exectime += (now()-_start);
     __processing = false;
-    process.nextTick(fire);
+    postpone(fire);
     return;
   }
   //console.log('start',cbs.length);
@@ -156,9 +164,9 @@ function fire(){
   if(__now>__lastMetrics+10000){
     resetMetrics();
   }
-  process.nextTick(fire);
+  postpone(fire);
 }
-process.nextTick(fire);
+postpone(fire);
 function metrics(){
   return __metrics;
 }
