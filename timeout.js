@@ -81,31 +81,45 @@ function resetMetrics(){
   __qin = 0;
   __qout = 0;
   __delay.reset();
+  if(__longestexec>300){
+    console.log(__longestexec,__longestexecfn);
+  }
   __longestexec = 0;
   __longestexecfn = '';
   __lastMetrics = __now;
 }
 
 function execute(fn,paramarry){
-  var _s = now();
+  var _s = now(),m;
   switch(typeof fn){
     case 'function':
       fn.apply({now:_s},paramarry);
       break;
     case 'object':
-      var m = paramarry.shift();
+      m = paramarry.shift();
       fn[m].apply(fn,paramarry);
       break;
   }
   var _elaps = now()-_s;
+  /* good for performance monitoring - log the long runners
+  if(_elaps>100){
+    console.log(_elaps,typeof fn==='function' ? fn.toString() : m);
+  }
+  */
   if(_elaps>__longestexec){
     __longestexec = _elaps;
-    __longestexecfn = fn.toString();
+    __longestexecfn = typeof fn==='function' ? fn.toString() : m;
   }
 }
 
 function fire(){
-  __now = now();
+  var n = now();
+  /*
+  if(n-__now>100){
+    console.log('gc time',n-__now);
+  }
+  */
+  __now = n;
   if(__processing){
     postpone(fire);
     return;
