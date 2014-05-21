@@ -88,7 +88,15 @@ function resetMetrics(){
 
 function execute(fn,paramarry){
   var _s = now();
-  fn.apply({now:_s},paramarry);
+  switch(typeof fn){
+    case 'function':
+      fn.apply({now:_s},paramarry);
+      break;
+    case 'object':
+      var m = paramarry.shift();
+      fn[m].apply(fn,paramarry);
+      break;
+  }
   var _elaps = now()-_s;
   if(_elaps>__longestexec){
     __longestexec = _elaps;
