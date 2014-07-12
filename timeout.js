@@ -96,8 +96,8 @@ function execute(fn,paramarry){
       fn.apply({now:_s},paramarry);
       break;
     case 'object':
-      if(!fn){return;}
       m = paramarry.shift();
+      if(!fn[m]){return;}
       fn[m].apply(fn,paramarry);
       break;
   }
