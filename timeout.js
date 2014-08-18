@@ -4,11 +4,13 @@ var immediates = [];
 var __cnt = 0;
 
 
-var postpone = process.version.match(/^v\d+\.(\d+)/)[1]>=10 ? function(cb){
+var postpone = process.env.HERS_TIMEOUT_SAVE_CPU ? function(cb){
+  setTimeout(cb,10);
+} : (process.version.match(/^v\d+\.(\d+)/)[1]>=10 ? function(cb){
   setImmediate(cb);
 }:function(cb){
   process.nextTick(cb);
-}
+});
 
 function inc(){
   __cnt ++;
@@ -114,14 +116,7 @@ function execute(fn,paramarry){
 }
 
 function fire(){
-  var n = now();
-  /*
-  if(n-__now>100){
-    console.log('gc time',n-__now);
-  }
-  */
-  __now = n;
-  if(__processing){
+  if(__processing || (immediates.length<1&&cbs.length<1)){
     postpone(fire);
     return;
   }
