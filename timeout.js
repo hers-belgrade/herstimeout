@@ -133,6 +133,7 @@ function fire(){
   }
   if(__now<__firsttrigger){
     __exectime += (now()-_start);
+    __now = _start;
     __processing = false;
     postpone(fire);
     return;
