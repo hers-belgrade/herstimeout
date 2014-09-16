@@ -3,14 +3,24 @@ var cbs = [];
 var immediates = [];
 var __cnt = 0;
 
-
-var postpone = process.env.HERS_TIMEOUT_SAVE_CPU ? function(cb){
-  setTimeout(cb,10);
-} : (process.version.match(/^v\d+\.(\d+)/)[1]>=10 ? function(cb){
-  setImmediate(cb);
-}:function(cb){
-  process.nextTick(cb);
-});
+var postpone;
+if(process.env.HERS_TIMEOUT_SAVE_CPU){
+  postpone = (function(){
+    var __timeout = null;
+    return function(cb){
+      if(__timeout){
+        clearTimeout(__timeout);
+      }
+      __timeout = setTimeout(cb,10);
+    };
+  })();
+}else{
+  postpone = (process.version.match(/^v\d+\.(\d+)/)[1]>=10 ? function(cb){
+    setImmediate(cb);
+  }:function(cb){
+    process.nextTick(cb);
+  });
+}
 
 function inc(){
   __cnt ++;
