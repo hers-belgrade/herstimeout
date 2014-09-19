@@ -7,11 +7,15 @@ var postpone;
 if(process.env.HERS_TIMEOUT_SAVE_CPU){
   postpone = (function(){
     var __timeout = null;
+    function postponedfire(cb){
+      __timeout = null;
+      cb();
+    }
     return function(cb){
-      if(__timeout){
-        clearTimeout(__timeout);
+      if(__timeout!==null){
+        return;
       }
-      __timeout = setTimeout(cb,10);
+      __timeout = setTimeout(postponedfire,10,cb);
     };
   })();
 }else{
